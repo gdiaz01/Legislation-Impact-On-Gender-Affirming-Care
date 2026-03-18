@@ -1,0 +1,831 @@
+---
+title: "Healthcare_Policies_SCM_Analysis"
+output: html_document
+date: "2026-02-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Processing
+
+### Import Libraries
+```{r}
+library(Synth)
+library("jsonlite")
+library(dplyr)
+library(tidyr)
+library("ggplot2")
+library("survival")
+library("survminer")
+library(scales)
+library(lubridate)
+library(readxl)
+
+```
+
+# Load in Data from Excel spreadsheets
+```{r}
+# Import Excel file with truveta data
+T_rates_df <- read_excel(
+  path = "Truveta_Prescriptions.xlsx",
+  sheet = "Sheet1"   
+)
+T_rates_df <- as.data.frame(T_rates_df)
+T_rates_df <- T_rates_df %>%
+  mutate(
+    Date = as.Date(paste0(Date, "-01"))  # 2015-01 -> 2015-01-01
+  )
+T_rates_df <- T_rates_df %>%
+  mutate(
+    legislation_date = as.Date((legislation_date))
+  )
+T_rates_df$Virtual_T_Rate <- as.numeric(T_rates_df$Virtual_T_Rate)
+T_rates_df$Total_T_Rate <- as.numeric(T_rates_df$Total_T_Rate)
+
+# Import Excel file with SCM covariate data
+SCM_df <- read_excel(
+  path = "SCM_Dataframe.xlsx",
+  sheet = "Sheet1"   
+)
+SCM_df <- as.data.frame(SCM_df)
+
+# Make all number columns numeric data type
+SCM_df <- SCM_df %>%
+  mutate(across(4:20, ~ as.numeric(.x)))
+
+# Assign unique number to each state for SCM
+SCM_df <- SCM_df %>%
+  mutate(state_id = as.integer(factor(state_name)))
+```
+
+# Create graphs for treatment states
+
+## States with Restrictive Legislation
+
+### Iowa
+```{r}
+plot_state <- "Iowa"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_IA <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "orangered") +         
+  geom_point(size = 2, colour = "orangered3") +  
+  geom_vline(xintercept = leg_date,
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) +
+                    0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -
+                          min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    breaks = seq(min(current_state$Date, na.rm = TRUE),
+                 max(current_state$Date, na.rm = TRUE),
+                 by = "1 month"),
+    labels = function(x) ifelse(month(x) %in% c(1, 7),
+                                format(x, "%Y-%m"),
+                                "")
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_IA
+
+```
+
+### Louisiana
+```{r}
+plot_state <- "Louisiana"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_LA <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "orangered") +         
+  geom_point(size = 2, colour = "orangered3") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_LA 
+```
+
+### Missouri
+```{r}
+plot_state <- "Missouri"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_MO <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "orangered") +         
+  geom_point(size = 2, colour = "orangered3") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_MO
+```
+
+### Ohio
+```{r}
+plot_state <- "Ohio"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state, Date >= as.Date("2016-01-01"))  # Ohio has high outlier in 2015
+leg_date <- current_state$legislation_date[1]
+
+p_OH <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "orangered") +         
+  geom_point(size = 2, colour = "orangered3") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_OH
+
+```
+
+### Texas
+```{r}
+plot_state <- "Texas"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_TX <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "orangered") +         
+  geom_point(size = 2, colour = "orangered3") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_TX
+
+```
+
+### Florida
+```{r}
+plot_state <- "Florida"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_FL <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "orangered") +         
+  geom_point(size = 2, colour = "orangered3") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_FL
+
+```
+
+## States with Shield Laws
+
+### California
+```{r}
+plot_state <- "California"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_CA <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "dodgerblue2") +         
+  geom_point(size = 2, colour = "dodgerblue4") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_CA
+
+```
+
+### Maryland
+```{r}
+plot_state <- "Maryland"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_MD <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "dodgerblue2") +         
+  geom_point(size = 2, colour = "dodgerblue4") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_MD
+
+```
+
+### Oregon
+```{r}
+plot_state <- "Oregon"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_OR <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "dodgerblue2") +         
+  geom_point(size = 2, colour = "dodgerblue4") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_OR
+
+```
+
+### Washington
+```{r}
+plot_state <- "Washington"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+p_WA <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "dodgerblue2") +         
+  geom_point(size = 2, colour = "dodgerblue4") +  
+  geom_vline(xintercept = leg_date,          # vertical line
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  # vertical line label
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) + 0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    date_breaks = "3 months",                        # major tick every 3 mo
+    date_labels = "%Y-%m",                           # shown as YYYY-MM
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +  # height / width ratio
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+p_WA
+```
+
+### Illinois
+```{r}
+plot_state <- "Illinois"
+
+current_state <- T_rates_df %>%
+  filter(State == plot_state)
+leg_date <- current_state$legislation_date[1]
+
+library(lubridate)
+
+p_IL <- ggplot(current_state, aes(x = Date, y = Total_T_Rate)) +
+  geom_line(size = 1, colour = "dodgerblue2") +         
+  geom_point(size = 2, colour = "dodgerblue4") +  
+  geom_vline(xintercept = leg_date,
+             linetype  = "dashed",
+             colour    = "gray37",
+             size      = 0.8) +
+  annotate("text",
+           x      = leg_date,
+           y      = min(current_state$Total_T_Rate, na.rm = TRUE) +
+                    0.15*(max(current_state$Total_T_Rate, na.rm = TRUE) -
+                          min(current_state$Total_T_Rate, na.rm = TRUE)),
+           label  = "Legislation Date",
+           vjust  = 1.4,
+           angle  = 90,
+           colour = "gray37",
+           size   = 3) +
+  scale_x_date(
+    breaks = seq(min(current_state$Date, na.rm = TRUE),
+                 max(current_state$Date, na.rm = TRUE),
+                 by = "1 month"),
+    labels = function(x) ifelse(month(x) %in% c(1, 7),
+                                format(x, "%Y-%m"),
+                                "")
+  ) +
+  labs(
+    title = paste("Normalized T Prescription Rates in", plot_state),
+    x = "Date",
+    y = "T Prescription Rate"
+  ) +
+  theme(aspect.ratio = 4/10) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title       = element_text(face = "bold"),
+    axis.text.x      = element_text(angle = 45, hjust = 1),
+    panel.grid.minor = element_blank()
+  )
+
+
+p_IL
+
+```
+
+### Subplots for all states
+```{r}
+(p_IA | p_LA | p_MO | p_OH | p_TX | p_FL) /
+(p_CA | p_MD | p_OR | p_WA | p_IL)
+```
+# Run Synthetic Control on Treatment States
+
+## Function Wrapper
+```{r}
+run_scm <- function(treated_state,
+                   control_state_ids,
+                   interruption_year,
+                   data) {
+  
+  treated_state_id <- data %>%
+  filter(`state_name` %in% c(treated_state)) %>%
+  distinct(state_id) %>%
+  pull(state_id)
+
+  # vectors for time periods 
+  time_predictors_prior <- 2019:(interruption_year - 1)
+  time_optimize_ssr     <- 2019:interruption_year
+  time_plot             <- 2019:2025   
+
+  dataprep_out <- dataprep(
+    foo = data,
+    predictors = c(
+      "Total People In Truveta", 
+      "Trans People In Truveta", 
+      "Uninsured raw value",
+      "Median Household Income raw value",
+      "% Below 18 Years of Age raw value",
+      "% 65 and Older raw value",
+      "% Non-Hispanic Black raw value",
+      "% American Indian or Alaska Native raw value",
+      "% Asian raw value",
+      "% Native Hawaiian or Other Pacific Islander raw value",
+      "% Hispanic raw value",
+      "% Non-Hispanic White raw value",
+      "% Female raw value",
+      "Fraction_Medicaid_Medicare"
+    ),
+    predictors.op = "mean",
+    dependent = "Total T Prescriptions",
+    unit.variable = "state_id",
+    time.variable = "Year",
+    special.predictors = NULL,
+    treatment.identifier = treated_state_id,
+    controls.identifier = control_state_ids,
+    time.predictors.prior = time_predictors_prior,
+    time.optimize.ssr = time_optimize_ssr,
+    unit.names.variable = "State Abbreviation",
+    time.plot = time_plot
+  )
+
+  synth_out <- synth(dataprep_out)
+  #list(dataprep = dataprep_out, synth = synth_out)
+  
+  # Predictor weights (solution.v) with predictor names
+  #v <- synth_out$solution.v
+  #cat("\nPredictor weights:\n")
+  #print(v)  # names(v) are predictor row names of X-matrix
+
+  # Control weights (solution.w) with state names
+  #w <- synth_out$solution.w              # matrix: rows = control units
+  #w_vec <- as.numeric(w)
+  #names(w_vec) <- rownames(w)            # should be control state names/ids
+  #cat("\nControl unit weights:\n")
+  #print(round(w_vec, 3))
+
+  path.plot(
+  synth.res    = synth_out,
+  dataprep.res = dataprep_out,
+  tr.intake    = interruption_year,                     # treatment year
+  Ylab         = "Total T Prescriptions",
+  Xlab         = "Year",
+  Main         = paste(treated_state, " vs Synthetic Control")
+)
+}
+```
+
+
+### Create Control group
+```{r}
+control_states <- SCM_df %>%
+  filter(`State Abbreviation` %in% c("MI", "WI", "PA", "VA", "HI", "AK", "NC")) %>%
+  distinct(state_id) %>%
+  pull(state_id)
+```
+
+## Run SCM and Plot for each state
+
+## Restrictive Sates 
+
+### Iowa
+```{r}
+state_to_use <- "Iowa"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Louisiana
+```{r}
+state_to_use <- "Louisiana"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Missouri
+```{r}
+state_to_use <- "Missouri"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Ohio
+```{r}
+state_to_use <- "Ohio"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date), Date >= as.Date("2016-01-01")) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Texas
+```{r}
+state_to_use <- "Texas"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Florida
+```{r}
+state_to_use <- "Florida"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+## Shield States
+
+### California
+```{r}
+state_to_use <- "California"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Maryland
+```{r}
+state_to_use <- "Maryland"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Oregon
+```{r}
+state_to_use <- "Oregon"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Washington
+```{r}
+state_to_use <- "Washington"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```
+
+### Illinois
+```{r}
+state_to_use <- "Illinois"
+
+leg_year <- T_rates_df %>%
+  filter(State == state_to_use, !is.na(legislation_date)) %>%
+  mutate(legislation_date = as.Date(legislation_date)) %>%
+  distinct(State, legislation_date) %>%   # just in case multiple rows
+  pull(legislation_date) %>%
+  year()
+
+run_scm(state_to_use, control_states, leg_year, SCM_df)
+```

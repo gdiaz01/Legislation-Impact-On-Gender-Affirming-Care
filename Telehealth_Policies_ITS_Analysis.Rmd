@@ -1,0 +1,282 @@
+---
+title: "Telehealth_Policies_ITS_Analysis"
+output: html_document
+date: "2026-02-12"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Data Processing
+### Load in libraries
+```{r}
+library("jsonlite")
+library(dplyr)
+library(tidyr)
+library("ggplot2")
+library("survival")
+library("survminer")
+library(scales)
+library(lubridate)
+library(readxl)
+
+```
+
+### Load in Data from Excel spreadsheets
+```{r}
+# Import Excel file with truveta data
+T_rates_df <- read_excel(
+  path = "Truveta_Prescriptions.xlsx",
+  sheet = "Sheet1"   
+)
+T_rates_df <- as.data.frame(T_rates_df)
+T_rates_df <- T_rates_df %>%
+  mutate(
+    Date = as.Date(paste0(Date, "-01"))  # 2015-01 -> 2015-01-01
+  )
+T_rates_df <- T_rates_df %>%
+  mutate(
+    legislation_date = as.Date((legislation_date))
+  )
+T_rates_df <- T_rates_df %>%
+  mutate(
+    year = year(Date)
+  )
+T_rates_df$Virtual_T_Rate <- as.numeric(T_rates_df$Virtual_T_Rate)
+T_rates_df$Total_T_Rate <- as.numeric(T_rates_df$Total_T_Rate)
+```
+
+## Filter years
+```{r}
+### Filter the dataframe to only include states that have specified number or more entries per year for the years range specified
+yearly_counts <- T_rates_df %>%
+  group_by(State, year) %>%
+  summarise(n_entries = n(), .groups = "drop") %>%
+  group_by(State) %>%
+  complete(year = 2017:2025, fill = list(n_entries = 0)) %>%
+  ungroup()
+
+years_required <- 2017:2025
+
+
+filtered_df <- T_rates_df %>%
+  # 1) drop rows where Virtual_T_Rate is 0
+  filter(Virtual_T_Rate != 0) %>%
+  
+  # 2) keep only years in desired range
+  filter(year %in% years_required) %>%
+  
+  # 3) within each state-year, require at least 9 rows
+  group_by(State, year) %>%
+  filter(n() >= 9) %>%
+  ungroup() %>%
+  
+  # 4) keep only states that have *all* required years present
+  group_by(State) %>%
+  filter(all(years_required %in% year)) %>%
+  ungroup()
+
+unique(filtered_df$State)
+
+```
+
+# Individual State Analysis
+
+## Function for running Interrupted Time Series Analysis / Segmented Regression
+```{r}
+run_its <- function(state_to_analyze,
+                          data,
+                          intervention_date = as.Date("2020-04-01")) {
+
+  state_monthly <- data %>%
+    filter(State == state_to_analyze) %>%
+    arrange(Date) %>%
+    mutate(
+      time       = row_number(),
+      post       = if_else(Date >= intervention_date, 1L, 0L),
+      time_after = if_else(post == 1L,
+                           time - min(time[post == 1L]) + 1L,
+                           0L)
+    )
+
+  model_state <- lm(Virtual_T_Rate ~ time + post + time_after,
+                    data = state_monthly)
+
+  state_monthly <- state_monthly %>%
+    mutate(fitted = fitted(model_state))
+
+  p <- ggplot(state_monthly, aes(x = Date)) +
+    geom_line(aes(y = Virtual_T_Rate), color = "black") +
+    geom_line(aes(y = fitted), color = "red") +
+    geom_vline(xintercept = intervention_date, linetype = "dashed") +
+    labs(
+      title = paste("ITS for", state_to_analyze),
+      x = "Month",
+      y = "Virtual T prescriptions per trans person"
+    ) +
+    theme_minimal()
+
+  # return both model and plot if you like
+  list(model = model_state, plot = p, data = state_monthly)
+}
+
+```
+
+### Oregon
+```{r}
+mod_or <- run_its("Oregon", filtered_df)
+mod_or$plot      # show plot
+summary(mod_or$model)  # model output
+
+b3_df <- data.frame(
+  State = character(),
+  b3    = numeric(),
+  stringsAsFactors = FALSE
+)
+
+b3 <- mod_or$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "Oregon",
+    b3    = b3
+  )
+)
+```
+
+### Louisiana
+```{r}
+mod_la <- run_its("Louisiana", filtered_df)
+mod_la$plot      # show plot
+summary(mod_la$model)  # model output
+
+b3 <- mod_la$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "Louisiana",
+    b3    = b3
+  )
+)
+```
+
+### Washington
+```{r}
+mod_wa <- run_its("Washington", filtered_df)
+mod_wa$plot      # show plot
+summary(mod_wa$model)  # model output
+
+b3 <- mod_wa$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "Washington",
+    b3    = b3
+  )
+)
+```
+
+### Texas
+```{r}
+mod_tx <- run_its("Texas", filtered_df)
+mod_tx$plot      # show plot
+summary(mod_tx$model)  # model output
+
+b3 <- mod_tx$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "Texas",
+    b3    = b3
+  )
+)
+```
+
+### North Carolina
+```{r}
+mod_nc <- run_its("North Carolina", filtered_df)
+mod_nc$plot      # show plot
+summary(mod_nc$model)  # model output
+
+b3 <- mod_nc$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "North Carolina",
+    b3    = b3
+  )
+)
+```
+
+### Wisconsin
+```{r}
+mod_wi <- run_its("Wisconsin", filtered_df)
+mod_wi$plot      # show plot
+summary(mod_wi$model)  # model output
+
+b3 <- mod_wi$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "Wisconsin",
+    b3    = b3
+  )
+)
+```
+
+### Michigan
+```{r}
+mod_mi <- run_its("Michigan", filtered_df)
+mod_mi$plot      # show plot
+summary(mod_mi$model)  # model output
+
+b3 <- mod_mi$model$coefficients[4]
+
+b3_df <- rbind(b3_df, data.frame(
+    State = "Michigan",
+    b3    = b3
+  )
+)
+```
+
+## Plot of all B3 coefficients (Change in slope after legislation)
+```{r}
+max_abs <- max(abs(b3_df$b3), na.rm = TRUE)
+
+state_colors <- c(
+  "Louisiana"      = "#1b9e77",
+  "North Carolina" = "#d95f02",
+  "Oregon"         = "#7570b3",
+  "Texas"          = "#e7298a",
+  "Washington"     = "#66a61e",
+  "Wisconsin"      = "#e6ab02",
+  "Michigan"       = "#a6761d"
+)
+
+ggplot(b3_df, aes(x = b3, y = reorder(State, b3))) +
+  geom_col(fill = "steelblue") +
+  geom_vline(xintercept = 0, color = "black") +
+  scale_x_continuous(
+    # extend limits a bit beyond data range to make room for labels
+    limits = c(min(b3_df$b3, na.rm = TRUE) - 0.1 * max_abs,
+               max(b3_df$b3, na.rm = TRUE) + 0.1 * max_abs),
+    labels = label_number(style_positive = "plus")
+  ) +
+  scale_fill_manual(values = state_colors) +
+  labs(
+    title = "Change in slope after interruption (b3)",
+    x = "Slope change (b3)",
+    y = "State"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+ggplot(b3_df, aes(x = b3, y = reorder(State, b3))) +
+  geom_col(fill = "steelblue") +
+  geom_vline(xintercept = 0, color = "black") +      # axis at 0
+  scale_x_continuous(limits = c(-max_abs, max_abs)) +  # symmetric range
+  labs(
+    title = "Change in Slope After Legislation",
+    x = "Change in Slope (Beta3 Coeff)",
+    y = "State"
+  ) +
+  theme_minimal()
+```
+
