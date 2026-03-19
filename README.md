@@ -15,15 +15,15 @@ This project analyzes different policies in the U.S. and their effects on gender
 This package includes the following files:
 1. PDF of all figures from results
 2. Data Prep/Raw Data Folders
-    a. County Health Ranking Data
-    b. Data Prep
-    c. JSON Files
+    - County Health Ranking Data
+    - Data Prep
+    - JSON Files
 3. Final Dataframes used in analysis
-    a. SCM_Dataframe.xlsx
-    b. Truveta_Prescriptions.xlsx
+    - SCM_Dataframe.xlsx
+    - Truveta_Prescriptions.xlsx
 4. Analysis R Markdown Files
-    a. Healthcare_Policies_SCM_Analysis.Rmd
-    b. Telehealth_Policies_ITS_Analysis.Rmd
+    - Healthcare_Policies_SCM_Analysis.Rmd
+    - Telehealth_Policies_ITS_Analysis.Rmd
 
 
 ## Steps For Usage:
